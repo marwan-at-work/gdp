@@ -1,37 +1,25 @@
 package bitbucket
 
 import (
-	"archive/tar"
-	"archive/zip"
-	"bytes"
-	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/marwan-at-work/gdp"
-	"github.com/marwan-at-work/vgop/semver"
 	"github.com/pkg/errors"
 )
 
 // New maybe needs credentials?
-func New() gdp.DownloadProtocol {
+func New() gdp.CodeHost {
 	return &client{}
 }
 
 type client struct{}
 
-func (c *client) List(ctx context.Context, module string) ([]string, error) {
-	tags := []string{}
-	owner, repo, err := gdp.SplitPath(module)
-	if err != nil {
-		return nil, errors.Wrap(err, "bitbucketList.splitPath")
-	}
+func (c *client) Tags(ctx context.Context, owner, repo string) ([]string, error) {
 	url := c.tagsURL(owner, repo)
 	resp, err := http.Get(url)
 	if err != nil {
@@ -42,58 +30,15 @@ func (c *client) List(ctx context.Context, module string) ([]string, error) {
 	if err = json.NewDecoder(resp.Body).Decode(&tr); err != nil {
 		return nil, errors.Wrap(err, "bitbucketList.decode")
 	}
-
+	tags := []string{}
 	for _, t := range tr.Values {
-		if semver.IsValid(t.Name) {
-			tags = append(tags, t.Name)
-		}
+		tags = append(tags, t.Name)
 	}
 
 	return tags, nil
 }
 
-func (c *client) Info(ctx context.Context, module, version string) (*gdp.RevInfo, error) {
-	version = strings.Replace(version, "+incompatible", "", 1)
-	owner, repo, err := gdp.SplitPath(module)
-	if err != nil {
-		return nil, errors.Wrap(err, "bitbucketInfo.SplitPath")
-	}
-	if gdp.IsPseudo(version) {
-		sha, err := gdp.ShaFromPseudo(version)
-		if err != nil {
-			return nil, errors.Wrap(err, "bitbucketInfo.shaFromPseudo")
-		}
-		return c.infoFromSha(ctx, owner, repo, sha)
-	}
-
-	return c.infoFromTag(ctx, owner, repo, version)
-}
-
-func (c *client) infoFromTag(ctx context.Context, owner, repo, tag string) (*gdp.RevInfo, error) {
-	var ri gdp.RevInfo
-	u := c.tagRefURL(owner, repo, tag)
-	resp, err := http.Get(u)
-	if err != nil {
-		return nil, errors.Wrap(err, "infoFromTag.httpGet")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("infoFromTag %v unexpected status %v", u, resp.StatusCode)
-	}
-	var tr tagRefResponse
-	if err = json.NewDecoder(resp.Body).Decode(&tr); err != nil {
-		return nil, errors.Wrap(err, "infoFromTag.decode")
-	}
-
-	ri.Name = tr.Target.Hash
-	ri.Short = tag
-	ri.Version = tag
-	ri.Time = tr.Target.Date
-
-	return &ri, nil
-}
-
-func (c *client) infoFromSha(ctx context.Context, owner, repo, sha string) (*gdp.RevInfo, error) {
+func (c *client) CommitInfo(ctx context.Context, owner, repo, sha string) (*gdp.RevInfo, error) {
 	var ri gdp.RevInfo
 	u := c.commitURL(owner, repo, sha)
 	resp, err := http.Get(u)
@@ -117,64 +62,63 @@ func (c *client) infoFromSha(ctx context.Context, owner, repo, sha string) (*gdp
 	return &ri, nil
 }
 
-func (c *client) Latest(ctx context.Context, module string) (*gdp.RevInfo, error) {
+func (c *client) TagInfo(ctx context.Context, owner, repo, tag string) (*gdp.RevInfo, error) {
 	var ri gdp.RevInfo
-	owner, repo, err := gdp.SplitPath(module)
-	if err != nil {
-		return nil, errors.Wrap(err, "bitbucketLatest.splitPath")
-	}
-
-	u := c.repoURL(owner, repo)
+	u := c.tagRefURL(owner, repo, tag)
 	resp, err := http.Get(u)
 	if err != nil {
-		return nil, errors.Wrap(err, "bitbucketLatest.httpGet")
+		return nil, errors.Wrap(err, "infoFromTag.httpGet")
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("bitbucketLatest.httpGet unexpected response code %v", resp.StatusCode)
+		return nil, fmt.Errorf("infoFromTag %v unexpected status %v", u, resp.StatusCode)
 	}
-	var rr repoResponse
-	if err = json.NewDecoder(resp.Body).Decode(&rr); err != nil {
-		return nil, errors.Wrap(err, "bitbucketLatest.jsonDecode")
-	}
-
-	u = c.branchRefURL(owner, repo, rr.Mainbranch.Name)
-	fmt.Println(u)
-	resp, err = http.Get(u)
-	if err != nil {
-		return nil, errors.Wrap(err, "bitbucketLatest.httpGetBranch")
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("bitbucketLatest.httpGetBranch unexpected response code %v", resp.StatusCode)
-	}
-	var br branchRefResponse
-	if err = json.NewDecoder(resp.Body).Decode(&br); err != nil {
-		return nil, errors.Wrap(err, "bitbucketLatest.jsonDecodeBranch")
+	var tr tagRefResponse
+	if err = json.NewDecoder(resp.Body).Decode(&tr); err != nil {
+		return nil, errors.Wrap(err, "infoFromTag.decode")
 	}
 
-	ri.Name = br.Target.Hash
-	ri.Short = ri.Name[:12]
-	ri.Time = br.Target.Date
-	ri.Version = gdp.Pseudo(ri.Time, ri.Short)
+	ri.Name = tr.Target.Hash
+	ri.Short = tag
+	ri.Version = tag
+	ri.Time = tr.Target.Date
 
 	return &ri, nil
 }
 
-func (c *client) GoMod(ctx context.Context, module, version string) ([]byte, error) {
-	version = strings.Replace(version, "+incompatible", "", 1)
-	var err error
-	owner, repo, err := gdp.SplitPath(module)
+func (c *client) LatestCommit(ctx context.Context, owner, repo string) (sha string, t time.Time, err error) {
+	u := c.repoURL(owner, repo)
+	resp, err := http.Get(u)
 	if err != nil {
-		return nil, errors.Wrap(err, "bitbucketGoMod.splitPath")
+		return "", time.Time{}, errors.Wrap(err, "bitbucketLatest.httpGet")
 	}
-	if gdp.IsPseudo(version) {
-		version, err = gdp.ShaFromPseudo(version)
-		if err != nil {
-			return nil, errors.Wrap(err, "bitbucketGoMod.shaFromPseudo")
-		}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", time.Time{}, fmt.Errorf("bitbucketLatest.httpGet unexpected response code %v", resp.StatusCode)
+	}
+	var rr repoResponse
+	if err = json.NewDecoder(resp.Body).Decode(&rr); err != nil {
+		return "", time.Time{}, errors.Wrap(err, "bitbucketLatest.jsonDecode")
 	}
 
+	u = c.branchRefURL(owner, repo, rr.Mainbranch.Name)
+	resp, err = http.Get(u)
+	if err != nil {
+		return "", time.Time{}, errors.Wrap(err, "bitbucketLatest.httpGetBranch")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", time.Time{}, fmt.Errorf("bitbucketLatest.httpGetBranch unexpected response code %v", resp.StatusCode)
+	}
+	var br branchRefResponse
+	if err = json.NewDecoder(resp.Body).Decode(&br); err != nil {
+		return "", time.Time{}, errors.Wrap(err, "bitbucketLatest.jsonDecodeBranch")
+	}
+
+	return br.Target.Hash, br.Target.Date, nil
+}
+
+func (c *client) GetModFile(ctx context.Context, owner, repo, version string) ([]byte, error) {
 	u := c.contentURL(owner, repo, version, "go.mod")
 	resp, err := http.Get(u)
 	if err != nil {
@@ -182,7 +126,7 @@ func (c *client) GoMod(ctx context.Context, module, version string) ([]byte, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return []byte(fmt.Sprintf("module %v", module)), nil
+		return nil, gdp.ErrNotFound
 	} else if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("%v returned %v at goModFromTag", u, resp.StatusCode)
 	}
@@ -194,65 +138,8 @@ func (c *client) GoMod(ctx context.Context, module, version string) ([]byte, err
 	return bts, nil
 }
 
-func (c *client) Zip(ctx context.Context, module, version string) (io.Reader, error) {
-	ref := strings.Replace(version, "+incompatible", "", 1)
-	var err error
-	if strings.HasPrefix(version, "v0.0.0-") {
-		ref, err = gdp.ShaFromPseudo(version)
-		if err != nil {
-			return nil, errors.Wrap(err, "Zip.shaFromPseudo")
-		}
-	}
-	owner, repo, err := gdp.SplitPath(module)
-	if err != nil {
-		return nil, errors.Wrap(err, "Zip.splitPath")
-	}
-	u := c.tarURL(owner, repo, ref)
-	resp, err := http.Get(u)
-	if err != nil {
-		return nil, errors.Wrap(err, "Zip.httpGet")
-	}
-
-	gr, err := gzip.NewReader(resp.Body)
-	if err != nil {
-		return nil, errors.Wrap(err, "Zip.gzipNewReader")
-	}
-
-	t := tar.NewReader(gr)
-	t.Next()             // pax
-	dir, err := t.Next() // top level dir
-	if err != nil {
-		return nil, errors.Wrap(err, "Zip.tarNext")
-	}
-
-	goModName := "bitbucket.org" + owner + "/" + repo + "@" + version + "/"
-	dirName := dir.Name
-	var buf bytes.Buffer
-	zw := zip.NewWriter(&buf)
-	defer zw.Close()
-	for {
-		h, err := t.Next()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, errors.Wrap(err, "Zip.tarNext")
-		} else if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeDir {
-			continue
-		}
-
-		path := strings.Replace(h.Name, dirName, goModName, 1)
-		w, err := zw.Create(path)
-		if err != nil {
-			return nil, errors.Wrap(err, "Zip.zipCreate")
-		}
-
-		_, err = io.Copy(w, t)
-		if err != nil {
-			return nil, errors.Wrap(err, "Zip.ioCopu")
-		}
-	}
-
-	return &buf, nil
+func (c *client) TarURL(ctx context.Context, owner, repo, version string) (string, error) {
+	return c.tarURL(owner, repo, version), nil
 }
 
 func (c *client) contentURL(owner, repo, tag, path string) string {

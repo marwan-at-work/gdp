@@ -20,21 +20,31 @@ const pathVersionZip = "/{module:.+}/@v/{version}.zip"
 
 var token = flag.String("token", "", "github token against rate limiting")
 
+func getRedirectURL(path string) string {
+	return "http://localhost:3000/" + strings.TrimPrefix(path, "/")
+}
+
 func main() {
+	flag.Parse()
 	r := mux.NewRouter()
 	dp := download.New(*token)
 	r.HandleFunc(pathList, func(w http.ResponseWriter, r *http.Request) {
 		module, err := getModule(r)
 		if err != nil {
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(400)
 			return
 		}
 
 		vers, err := dp.List(r.Context(), module)
 		if err != nil {
+			sc := statusErr(err)
+			if sc == 404 {
+				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
+				return
+			}
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(sc)
 			return
 		}
 
@@ -45,13 +55,18 @@ func main() {
 		module, ver, err := modAndVersion(r)
 		if err != nil {
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(400)
 			return
 		}
 		bts, err := dp.GoMod(r.Context(), module, ver)
 		if err != nil {
+			sc := statusErr(err)
+			if sc == 404 {
+				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
+				return
+			}
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(sc)
 			return
 		}
 
@@ -62,13 +77,18 @@ func main() {
 		module, ver, err := modAndVersion(r)
 		if err != nil {
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(400)
 			return
 		}
 		info, err := dp.Info(r.Context(), module, ver)
 		if err != nil {
+			sc := statusErr(err)
+			if sc == 404 {
+				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
+				return
+			}
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(sc)
 			return
 		}
 
@@ -79,14 +99,19 @@ func main() {
 		module, err := getModule(r)
 		if err != nil {
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(400)
 			return
 		}
 
 		info, err := dp.Latest(r.Context(), module)
 		if err != nil {
+			sc := statusErr(err)
+			if sc == 404 {
+				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
+				return
+			}
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(sc)
 			return
 		}
 
@@ -97,13 +122,18 @@ func main() {
 		module, ver, err := modAndVersion(r)
 		if err != nil {
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(400)
 			return
 		}
 		rdr, err := dp.Zip(r.Context(), module, ver)
 		if err != nil {
+			sc := statusErr(err)
+			if sc == 404 {
+				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
+				return
+			}
 			fmt.Println(err)
-			w.WriteHeader(statusErr(err))
+			w.WriteHeader(sc)
 			return
 		}
 
@@ -159,7 +189,7 @@ func modAndVersion(r *http.Request) (mod, ver string, err error) {
 }
 
 func statusErr(err error) int {
-	if err == download.ErrNotFound {
+	if err == ErrNotFound {
 		return 404
 	}
 

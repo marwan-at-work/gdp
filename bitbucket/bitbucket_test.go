@@ -6,10 +6,11 @@ import (
 	"io"
 	"testing"
 
+	"github.com/marwan-at-work/gdp"
 	"github.com/spf13/afero"
 )
 
-var c = client{}
+var c = gdp.New(New())
 var ctx = context.Background()
 
 // TODO: create test repos.

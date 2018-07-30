@@ -11,11 +11,9 @@ import (
 
 	"github.com/marwan-at-work/gdp"
 	"github.com/spf13/afero"
-
-	"github.com/google/go-github/github"
 )
 
-var d = dp{c: github.NewClient(nil)}
+var d = gdp.New(New("")) // TODO: token from env var.
 
 // TODO: create test repos as these tests will eventually fail when they introduce new versions.
 

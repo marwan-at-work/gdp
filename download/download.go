@@ -2,7 +2,6 @@ package download
 
 import (
 	"context"
-	"errors"
 	"io"
 	"strings"
 
@@ -17,15 +16,12 @@ const (
 	gpi = "gopkg.in"
 )
 
-// ErrNotFound error
-var ErrNotFound = errors.New("not found")
-
 // New returns a DownloadProtocol that implements
 // Github, Bitbucket, and Gopkg.in.
 func New(githubToken string) gdp.DownloadProtocol {
 	var d download
-	g := github.New(githubToken)
-	b := bitbucket.New()
+	g := gdp.New(github.New(githubToken))
+	b := gdp.New(bitbucket.New())
 	d.protos = map[string]gdp.DownloadProtocol{
 		gh: g,
 		bb: b,

@@ -9,6 +9,9 @@ import (
 	"github.com/pkg/errors"
 )
 
+// ErrNotFound error
+var ErrNotFound = errors.New("not found")
+
 // DownloadProtocol of cmd/go
 type DownloadProtocol interface {
 	List(ctx context.Context, module string) ([]string, error)
@@ -24,6 +27,18 @@ type RevInfo struct {
 	Name    string    // complete ID in underlying repository
 	Short   string    // shortened ID, for use in pseudo-version
 	Time    time.Time // commit time
+}
+
+// CodeHost describes a code hosting API (github, bitbucket etc)
+// where they have common functionalities to deal with repositories,
+// users, commits, and tags.
+type CodeHost interface {
+	Tags(ctx context.Context, owner, repo string) ([]string, error)
+	CommitInfo(ctx context.Context, owner, repo, sha string) (*RevInfo, error)
+	TagInfo(ctx context.Context, owner, repo, tag string) (*RevInfo, error)
+	LatestCommit(ctx context.Context, owner, repo string) (sha string, t time.Time, err error)
+	GetModFile(ctx context.Context, owner, repo, version string) ([]byte, error)
+	TarURL(ctx context.Context, owner, repo, version string) (string, error)
 }
 
 // PseudoTime for a shortened commit sha: YYYYMMDDHHMMSS
