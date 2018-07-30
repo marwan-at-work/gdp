@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/mux"
-	"github.com/marwan-at-work/gdp"
+	"github.com/marwan-at-work/gdp/download"
 )
 
 const pathList = "/{module:.+}/@v/list"
@@ -17,14 +18,23 @@ const pathVersionInfo = "/{module:.+}/@v/{version}.info"
 const pathLatest = "/{module:.+}/@latest"
 const pathVersionZip = "/{module:.+}/@v/{version}.zip"
 
+var token = flag.String("token", "", "github token against rate limiting")
+
 func main() {
 	r := mux.NewRouter()
-	dp := gdp.New("")
+	dp := download.New(*token)
 	r.HandleFunc(pathList, func(w http.ResponseWriter, r *http.Request) {
-		module := mux.Vars(r)["module"]
+		module, err := getModule(r)
+		if err != nil {
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
+			return
+		}
+
 		vers, err := dp.List(r.Context(), module)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
 			return
 		}
 
@@ -32,12 +42,16 @@ func main() {
 	})
 
 	r.HandleFunc(pathVersionModule, func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		module := vars["module"]
-		ver := vars["version"]
+		module, ver, err := modAndVersion(r)
+		if err != nil {
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
+			return
+		}
 		bts, err := dp.GoMod(r.Context(), module, ver)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
 			return
 		}
 
@@ -45,12 +59,16 @@ func main() {
 	})
 
 	r.HandleFunc(pathVersionInfo, func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		module := vars["module"]
-		ver := vars["version"]
+		module, ver, err := modAndVersion(r)
+		if err != nil {
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
+			return
+		}
 		info, err := dp.Info(r.Context(), module, ver)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
 			return
 		}
 
@@ -58,26 +76,34 @@ func main() {
 	})
 
 	r.HandleFunc(pathLatest, func(w http.ResponseWriter, r *http.Request) {
-		module := mux.Vars(r)["module"]
-		info, err := dp.Latest(r.Context(), module)
+		module, err := getModule(r)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
 			return
 		}
 
-		fmt.Printf("nice %+v\n", info)
+		info, err := dp.Latest(r.Context(), module)
+		if err != nil {
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
+			return
+		}
 
 		json.NewEncoder(w).Encode(info)
 	})
 
 	r.HandleFunc(pathVersionZip, func(w http.ResponseWriter, r *http.Request) {
-		vars := mux.Vars(r)
-		module := vars["module"]
-		ver := vars["version"]
+		module, ver, err := modAndVersion(r)
+		if err != nil {
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
+			return
+		}
 		rdr, err := dp.Zip(r.Context(), module, ver)
 		if err != nil {
-			fmt.Println("uhh", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			fmt.Println(err)
+			w.WriteHeader(statusErr(err))
 			return
 		}
 
@@ -98,4 +124,44 @@ func main() {
 	})
 
 	http.ListenAndServe(":8090", r)
+}
+
+func getModule(r *http.Request) (string, error) {
+	str := mux.Vars(r)["module"]
+	if str == "" {
+		return "", fmt.Errorf("missing module in path")
+	}
+
+	return DecodePath(str)
+}
+
+func getVersion(r *http.Request) (string, error) {
+	str := mux.Vars(r)["version"]
+	if str == "" {
+		return "", fmt.Errorf("missing version in path")
+	}
+
+	return DecodeVersion(str)
+}
+
+func modAndVersion(r *http.Request) (mod, ver string, err error) {
+	mod, err = getModule(r)
+	if err != nil {
+		return "", "", err
+	}
+
+	ver, err = getVersion(r)
+	if err != nil {
+		return "", "", err
+	}
+
+	return mod, ver, nil
+}
+
+func statusErr(err error) int {
+	if err == download.ErrNotFound {
+		return 404
+	}
+
+	return 500
 }

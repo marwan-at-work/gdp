@@ -1,4 +1,4 @@
-package gdp
+package github
 
 import (
 	"archive/zip"
@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/marwan-at-work/gdp"
 	"github.com/spf13/afero"
 
 	"github.com/google/go-github/github"
@@ -53,7 +54,7 @@ func TestInfo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := &RevInfo{
+	expected := &gdp.RevInfo{
 		Name:    "645ef00459ed84a119197bfb8d8205042c6df63d",
 		Short:   "v0.8.0",
 		Version: "v0.8.0",
@@ -71,7 +72,7 @@ func TestLatest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expected := &RevInfo{
+	expected := &gdp.RevInfo{
 		Name:    "816c9085562cd7ee03e7f8188a1cfd942858cded",
 		Short:   "816c9085562c",
 		Version: "v0.0.0-20180311214515-816c9085562c",
