@@ -4,7 +4,7 @@ GDP implements the Go Download Protocol over code hosting APIs. It supports both
 
 You can use the gdp implementation programtically or you can use the server in cmd/gdp to test out the functionality against vgo or cmd/go by setting the GOPROXY env var to to http://localhost:8090
 
-Currently GDP supports Github and Bitbucket APIs. 
+Currently GDP supports Github, Bitbucket and Gopkg.in. 
 
 ### Example
 
