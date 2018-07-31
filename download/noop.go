@@ -25,6 +25,6 @@ func (noOpProtocol) GoMod(context.Context, string, string) ([]byte, error) {
 	return nil, gdp.ErrNotFound
 }
 
-func (noOpProtocol) Zip(context.Context, string, string) (io.Reader, error) {
+func (noOpProtocol) Zip(context.Context, string, string, string) (io.Reader, error) {
 	return nil, gdp.ErrNotFound
 }

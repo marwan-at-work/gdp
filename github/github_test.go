@@ -83,7 +83,7 @@ func TestLatest(t *testing.T) {
 }
 
 func TestZip(t *testing.T) {
-	rdr, err := d.Zip(context.Background(), "github.com/pkg/errors", "v0.8.0")
+	rdr, err := d.Zip(context.Background(), "github.com/pkg/errors", "v0.8.0", "")
 	if err != nil {
 		t.Fatal(err)
 	}

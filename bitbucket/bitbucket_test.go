@@ -52,7 +52,7 @@ func TestGoMod(t *testing.T) {
 }
 
 func TestZip(t *testing.T) {
-	rdr, err := c.Zip(context.Background(), "bitbucket.org/pkg/inflect", "v0.0.0-20130829110746-8961c3750a47")
+	rdr, err := c.Zip(context.Background(), "bitbucket.org/pkg/inflect", "v0.0.0-20130829110746-8961c3750a47", "")
 	if err != nil {
 		t.Fatal(err)
 	}

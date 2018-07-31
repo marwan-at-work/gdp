@@ -126,7 +126,7 @@ func main() {
 			w.WriteHeader(400)
 			return
 		}
-		rdr, err := dp.Zip(r.Context(), module, ver)
+		rdr, err := dp.Zip(r.Context(), module, ver, "")
 		if err != nil {
 			sc := statusErr(err)
 			if sc == 404 {
