@@ -20,9 +20,10 @@ const pathLatest = "/{module:.+}/@latest"
 const pathVersionZip = "/{module:.+}/@v/{version}.zip"
 
 var token = flag.String("token", "", "github token against rate limiting")
+var redirect = flag.String("redirect", "", "redirect instead of 404")
 
 func getRedirectURL(path string) string {
-	return "http://localhost:3000/" + strings.TrimPrefix(path, "/")
+	return strings.TrimSuffix(*redirect, "/") + "/" + strings.TrimPrefix(path, "/")
 }
 
 func main() {
@@ -40,7 +41,7 @@ func main() {
 		vers, err := dp.List(r.Context(), module)
 		if err != nil {
 			sc := statusErr(err)
-			if sc == 404 {
+			if sc == 404 && *redirect != "" {
 				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
 				return
 			}
@@ -62,7 +63,7 @@ func main() {
 		bts, err := dp.GoMod(r.Context(), module, ver)
 		if err != nil {
 			sc := statusErr(err)
-			if sc == 404 {
+			if sc == 404 && *redirect != "" {
 				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
 				return
 			}
@@ -84,7 +85,7 @@ func main() {
 		info, err := dp.Info(r.Context(), module, ver)
 		if err != nil {
 			sc := statusErr(err)
-			if sc == 404 {
+			if sc == 404 && *redirect != "" {
 				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
 				return
 			}
@@ -107,7 +108,7 @@ func main() {
 		info, err := dp.Latest(r.Context(), module)
 		if err != nil {
 			sc := statusErr(err)
-			if sc == 404 {
+			if sc == 404 && *redirect != "" {
 				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
 				return
 			}
@@ -129,7 +130,7 @@ func main() {
 		rdr, err := dp.Zip(r.Context(), module, ver, "")
 		if err != nil {
 			sc := statusErr(err)
-			if sc == 404 {
+			if sc == 404 && *redirect != "" {
 				http.Redirect(w, r, getRedirectURL(r.URL.Path), http.StatusMovedPermanently)
 				return
 			}
