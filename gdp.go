@@ -74,18 +74,24 @@ func ShaFromPseudo(sv string) (string, error) {
 
 // SplitPath takes a valid import path such as
 // github.com/a/b and returns the owner and repo (a, b)
-func SplitPath(path string) (owner, repo string, err error) {
+func SplitPath(path string) (owner, repo, version string, err error) {
 	els := strings.Split(path, "/")
 	switch els[0] {
 	case "github.com", "bitbucket.org":
 		if len(els) != 3 {
-			return "", "", errors.New("splitPath: unparsable github path: " + path)
+			return "", "", "", errors.New("splitPath: unparsable github path: " + path)
 		}
 		owner = els[1]
 		repo = els[2]
 
-		return owner, repo, nil
+		return owner, repo, "", nil
+	case "gopkg.in":
+		return deduceGopkg(path)
 	}
 
-	return "", "", errors.New("splitPath: unsupported API")
+	return "", "", "", errors.New("splitPath: unsupported API")
+}
+
+func deduceGopkg(p string) (owner, repo, version string, err error) {
+	return "", "", "", errors.New("nope")
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gorilla/mux"
+	"github.com/marwan-at-work/gdp"
 	"github.com/marwan-at-work/gdp/download"
 )
 
@@ -189,7 +190,7 @@ func modAndVersion(r *http.Request) (mod, ver string, err error) {
 }
 
 func statusErr(err error) int {
-	if err == ErrNotFound {
+	if err == gdp.ErrNotFound {
 		return 404
 	}
 
