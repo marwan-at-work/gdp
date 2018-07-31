@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/marwan-at-work/vgop/semver"
@@ -137,22 +138,41 @@ func (g *generic) Zip(ctx context.Context, module, version, zipPrefix string) (i
 	}
 
 	t := tar.NewReader(gr)
-	t.Next()             // pax
-	dir, err := t.Next() // top level dir
-	if err != nil {
-		return nil, errors.Wrap(err, "zip.tarNext")
-	}
-
 	goModName := g.org(module) + "/" + owner + "/" + repo + "@" + version + "/"
 	if zipPrefix != "" {
 		goModName = zipPrefix + "@" + version + "/"
 	}
-	dirName := dir.Name
+	var dirName string
+
+	// grab the first folder/file header to extract the directory name so it can be replaced
+	// with goModName from above. Go expects the tar to have a certain directory prefix.
+	// Github always has a directory header, while bitbucket jumps straight into the file.
+	// This loop accounts for both cases.
+	h, err := t.Next()
+	for {
+		if err != nil {
+			return nil, errors.Wrap(err, "zip.tarNext")
+		}
+		if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeDir {
+			h, err = t.Next()
+			continue
+		}
+		if h.Typeflag == tar.TypeDir {
+			dirName = h.Name
+			h, err = t.Next()
+			break
+		}
+		if h.Typeflag == tar.TypeReg {
+			dirName = filepath.Dir(h.Name) + "/"
+			break
+		}
+		h, err = t.Next()
+	}
+
 	pr, pw := io.Pipe()
 	go func() {
 		zw := zip.NewWriter(pw)
 		for {
-			h, err := t.Next()
 			if err == io.EOF {
 				break
 			} else if err != nil {
@@ -160,11 +180,12 @@ func (g *generic) Zip(ctx context.Context, module, version, zipPrefix string) (i
 				pw.CloseWithError(errors.Wrap(err, "zip.tarNext"))
 				return
 			} else if h.Typeflag != tar.TypeReg && h.Typeflag != tar.TypeDir {
+				h, err = t.Next()
 				continue
 			}
-
 			path := strings.Replace(h.Name, dirName, goModName, 1)
-			w, err := zw.Create(path)
+			var w io.Writer // otherwise we shadow err and we end up calling nil.Next on line 183.
+			w, err = zw.Create(path)
 			if err != nil {
 				zw.Close()
 				pw.CloseWithError(errors.Wrap(err, "zip.zipCreate"))
@@ -177,6 +198,7 @@ func (g *generic) Zip(ctx context.Context, module, version, zipPrefix string) (i
 				pw.CloseWithError(errors.Wrap(err, "zip.ioCopy"))
 				return
 			}
+			h, err = t.Next()
 		}
 		zw.Close()
 		pw.Close()
