@@ -16,7 +16,13 @@ Create a test a repo outside of GOPATH with the following two files
 
 package main
 
-import _ "github.com/pkg/errors"
+import (
+	_ "bitbucket.org/ww/goautoneg"
+	_ "github.com/NYTimes/gizmo"
+	_ "github.com/marwan-at-work/gdp"
+	_ "github.com/pkg/errors"
+	_ "gopkg.in/yaml.v2"
+)
 
 func main() {}
 ```
