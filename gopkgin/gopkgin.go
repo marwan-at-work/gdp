@@ -14,12 +14,13 @@ import (
 // New returns a Gopkg.in DownloadProtocol
 // it is not a codehose, and therefore it needs
 // a githubProtocol to use for the real data.
-func New(gdp gdp.DownloadProtocol) gdp.DownloadProtocol {
-	return &downloadProtocol{gdp}
+func New(gdp gdp.DownloadProtocol, gch gdp.CodeHost) gdp.DownloadProtocol {
+	return &downloadProtocol{gdp, gch}
 }
 
 type downloadProtocol struct {
 	gdp gdp.DownloadProtocol
+	gch gdp.CodeHost
 }
 
 func (ch *downloadProtocol) githubPath(module string) (string, string, error) {
@@ -28,6 +29,11 @@ func (ch *downloadProtocol) githubPath(module string) (string, string, error) {
 		return "", "", errors.Wrap(err, "gopkgin.githubPath")
 	}
 	return "github.com/" + owner + "/" + repo, major, nil
+}
+
+func (ch *downloadProtocol) parsePath(module string) (string, string) {
+	owner, repo, _, _ := gdp.ParseGopkgPath(module)
+	return owner, repo
 }
 
 func (ch *downloadProtocol) List(ctx context.Context, module string) ([]string, error) {
@@ -40,6 +46,12 @@ func (ch *downloadProtocol) List(ctx context.Context, module string) ([]string, 
 	if err != nil {
 		return nil, errors.Wrap(err, "gopkgin.List")
 	}
+	owner, repo := ch.parsePath(module)
+	branches, err := ch.gch.Branches(ctx, owner, repo)
+	if err != nil {
+		return nil, errors.Wrap(err, "gopkgin.Branches")
+	}
+	tags = append(tags, branches...)
 
 	filtered := []string{}
 	for _, t := range tags {

@@ -53,6 +53,26 @@ func (d *codeHost) Tags(ctx context.Context, owner, repo string) ([]string, erro
 	return allTags, nil
 }
 
+func (d *codeHost) Branches(ctx context.Context, owner, repo string) ([]string, error) {
+	branches := []string{}
+	page := 1
+	for {
+		bb, _, err := d.c.Repositories.ListBranches(ctx, owner, repo, &github.ListOptions{Page: page, PerPage: 100})
+		if err != nil {
+			return nil, errors.Wrapf(err, "github.Branches page %v", page)
+		}
+		if len(bb) == 0 {
+			break
+		}
+		for _, b := range bb {
+			branches = append(branches, b.GetName())
+		}
+		page++
+	}
+
+	return branches, nil
+}
+
 func (d *codeHost) CommitInfo(ctx context.Context, owner, repo, sha string) (*gdp.RevInfo, error) {
 	var ri gdp.RevInfo
 	c, _, err := d.c.Repositories.GetCommit(ctx, owner, repo, sha)

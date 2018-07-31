@@ -33,6 +33,7 @@ type RevInfo struct {
 // where they have common functionalities to deal with repositories,
 // users, commits, and tags.
 type CodeHost interface {
+	Branches(ctx context.Context, owner, repo string) ([]string, error)
 	Tags(ctx context.Context, owner, repo string) ([]string, error)
 	CommitInfo(ctx context.Context, owner, repo, sha string) (*RevInfo, error)
 	TagInfo(ctx context.Context, owner, repo, tag string) (*RevInfo, error)

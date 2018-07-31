@@ -21,9 +21,10 @@ const (
 // Github, Bitbucket, and Gopkg.in.
 func New(githubToken string) gdp.DownloadProtocol {
 	var d download
-	g := gdp.New(github.New(githubToken))
+	gch := github.New(githubToken)
+	g := gdp.New(gch)
 	b := gdp.New(bitbucket.New())
-	gpiDP := gopkgin.New(g)
+	gpiDP := gopkgin.New(g, gch)
 	d.protos = map[string]gdp.DownloadProtocol{
 		gh:  g,
 		bb:  b,

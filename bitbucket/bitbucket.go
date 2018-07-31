@@ -19,6 +19,10 @@ func New() gdp.CodeHost {
 
 type client struct{}
 
+func (c *client) Branches(ctx context.Context, owner string, repo string) ([]string, error) {
+	return nil, errors.New("bitbucket: unimplemented")
+}
+
 func (c *client) Tags(ctx context.Context, owner, repo string) ([]string, error) {
 	url := c.tagsURL(owner, repo)
 	resp, err := http.Get(url)
