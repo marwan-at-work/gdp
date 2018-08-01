@@ -1,6 +1,6 @@
 # GDP
 
-GDP implements the [Go Download Protocol](https://github.com/golang/go/wiki/Modules) over code hosting APIs. It supports both tagged and untagged modules. 
+GDP implements a real-time [Go Download Protocol](https://github.com/golang/go/wiki/Modules) over code hosting APIs. It supports both tagged and untagged modules. It streams modules directly from code hosting APIs into cmd/go without having to store anything.
 
 You can use the gdp implementation programtically or you can use the server in cmd/gdp to test out the functionality against vgo or cmd/go by setting the GOPROXY env var to to http://localhost:8090
 
