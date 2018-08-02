@@ -5,6 +5,8 @@ import (
 	"io"
 	"strings"
 
+	"github.com/marwan-at-work/gdp/vanity"
+
 	"github.com/marwan-at-work/gdp"
 	"github.com/marwan-at-work/gdp/bitbucket"
 	"github.com/marwan-at-work/gdp/github"
@@ -25,17 +27,20 @@ func New(githubToken string) gdp.DownloadProtocol {
 	g := gdp.New(gch)
 	b := gdp.New(bitbucket.New())
 	gpiDP := gopkgin.New(g, gch)
+	v := vanity.New(g, b)
 	d.protos = map[string]gdp.DownloadProtocol{
 		gh:  g,
 		bb:  b,
 		gpi: gpiDP,
 	}
+	d.vanity = v
 
 	return &d
 }
 
 type download struct {
 	protos map[string]gdp.DownloadProtocol
+	vanity gdp.DownloadProtocol
 }
 
 func (d *download) List(ctx context.Context, module string) ([]string, error) {
@@ -65,5 +70,5 @@ func (d *download) deduceProtocol(module string) gdp.DownloadProtocol {
 		}
 	}
 
-	return noOpProtocol{}
+	return d.vanity
 }

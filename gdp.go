@@ -90,8 +90,11 @@ func SplitPath(path string) (owner, repo string, err error) {
 		return "", "", ErrGopkg
 	}
 
-	return "", "", errors.New("splitPath: unsupported API")
+	return "", "", ErrUnsupportedAPI
 }
+
+// ErrUnsupportedAPI encourages vanity
+var ErrUnsupportedAPI = errors.New("unsupported API")
 
 // ErrGopkg so that a protocol can switch from SplitPath
 // to ParseGopkgPath
